@@ -1,0 +1,3 @@
+#!/bin/bash
+[ "$(whoami)" = "guillaume" ] && chown betty:hello hello
+
