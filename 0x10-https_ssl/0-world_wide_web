@@ -1,23 +1,37 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-domain="$1"
-subdomain="$2"
+# Function to display information about subdomains
+display_info() {
+    sub_domain=$1
+    domain=$2
 
-# Define function to query DNS records
-query_dns() {
-    dig "$1"."$domain" | awk '/ANSWER SECTION/ {getline; print $NF}'
+    if [ -z "$sub_domain" ]; then
+        sub_domain_list=("www" "lb-01" "web-01" "web-02")
+    else
+        sub_domain_list=("$sub_domain")
+    fi
+
+    for sub in "${sub_domain_list[@]}"; do
+        dig_output=$(dig $sub.$domain | awk '/^;; ANSWER SECTION:$/,/^$/' | grep -v ';;' | grep -oP '(\d+\.\d+\.\d+\.\d+)')
+        record_type=$(echo "$dig_output" | awk '{ if(NR == 1) { print "A" } else { print "CNAME" }}')
+        destination=$(echo "$dig_output" | awk '{ if(NR == 1) { print $1 } else { print "ERROR: CNAME record detected" }}')
+
+        echo "The subdomain $sub is a $record_type record and points to $destination"
+    done
 }
 
-# If subdomain is not provided, query default subdomains
-if [ -z "$subdomain" ]; then
-    subdomains=("www" "lb-01" "web-01" "web-02")
+# Main script logic
+if [ $# -eq 0 ]; then
+    echo "Error: No arguments provided. Please provide domain name."
+    exit 1
+elif [ $# -eq 1 ]; then
+    domain=$1
+    display_info "" $domain
+elif [ $# -eq 2 ]; then
+    domain=$1
+    sub_domain=$2
+    display_info $sub_domain $domain
 else
-    subdomains=("$subdomain")
+    echo "Error: Too many arguments provided."
+    exit 1
 fi
-
-# Iterate over subdomains and display information
-for sub in "${subdomains[@]}"; do
-    record_type=$(query_dns "$sub" | awk '{print $2}')
-    destination=$(query_dns "$sub")
-    echo "The subdomain $sub is a $record_type record and points to $destination"
-done
